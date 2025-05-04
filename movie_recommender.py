@@ -38,7 +38,7 @@ tfidf_matrix = tfidf.fit_transform(movies['tags'])
 cosine_sim = cosine_similarity(tfidf_matrix, tfidf_matrix)
 
 # TMDB Poster Helper
-def get_poster(title, api_key="c7b18deb3171cf125bd4514a58aaa735"):
+def get_movie_details(title, api_key="c7b18deb3171cf125bd4514a58aaa735"):
     idx = movies[movies['title'].str.lower() == title.lower()].index
     if idx.empty:
         return None
@@ -47,9 +47,14 @@ def get_poster(title, api_key="c7b18deb3171cf125bd4514a58aaa735"):
     response = requests.get(url)
     if response.status_code == 200:
         data = response.json()
-        poster_path = data.get("poster_path")
-        if poster_path:
-            return f"https://image.tmdb.org/t/p/w500{poster_path}"
+        return {
+            "title": data.get("title"),
+            "rating": data.get("vote_average"),
+            "poster_url": f"https://image.tmdb.org/t/p/w500{data.get('poster_path')}" if data.get("poster_path") else None,
+            "overview": data.get("overview"),
+            "release_date": data.get("release_date"),
+            "genres": ", ".join([genre['name'] for genre in data.get("genres", [])])
+        }
     return None
 
 def recommend(movie_title):
@@ -61,8 +66,9 @@ def recommend(movie_title):
         recommended = []
         for i in sorted_movies:
             title = movies.iloc[i[0]].title
-            poster_url = get_poster(title)
-            recommended.append((title, poster_url))
+            details = get_movie_details(title)
+            if details:
+                recommended.append(details)
         return recommended
     except:
         return []
@@ -72,12 +78,14 @@ if user_movie:
     recommendations = recommend(user_movie)
     if recommendations:
         st.subheader("Recommended Movies:")
-        for title, poster in recommendations:
-            st.markdown(f"**{title}**")
-            if poster:
-                st.image(poster, width=150)
+        for movie in recommendations:
+            st.markdown(f"### {movie['title']}")
+            st.markdown(f"*Rating*: {movie['rating']}/10")
+            st.markdown(f"*Release Date*: {movie['release_date']}")
+            st.markdown(f"*Genres*: {movie['genres']}")
+            st.markdown(f"*Overview*: {movie['overview']}")
+            if movie['poster_url']:
+                st.image(movie['poster_url'], width=250)
             st.markdown("---")
     else:
-        st.warning("Movie not found. Try another title.")
-
-st.caption("Built with Streamlit, TF-IDF, and TMDB API")
+        st.warning("Movie not found. Try another title.")
